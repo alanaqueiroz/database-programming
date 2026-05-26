@@ -186,83 +186,150 @@ NOCYCLE;
 
 CREATE FUNCTION FUNC_INSERIRFABRICANTE (p_id_fab fabricante.id_fab%TYPE, p_nome fabricante.nome%TYPE, p_apelido fabricante.apelido%TYPE) 
 RETURN NUMBER
-IS 
-    v_contador NUMBER(1); --FAZER NO MINIMO O LOG DE EXECUCAO SIMPLES
-    v_contador_nome NUMBER(1);
-    v_retorno NUMBER := 0;
-BEGIN
-    /*IF p_id_fab IS NULL THEN
-        v_retorno = -1; --NENHUM CÓDIGO FOI INFORMADO                              
-    END IF;*/
+IS
+    v_qtde          NUMBER;
+    v_retorno       NUMBER := 0;
 
-    IF p_id_fab != trunc(p_id_fab) THEN
-        v_retorno := -1; --O VALOR INFORMADO NÃO É UM INTEIRO                              
+    v_erro          NUMBER;
+    v_desc_erro     VARCHAR2(1000);
+
+BEGIN
+
+    ----------------------------------------------------------------
+    -- VALIDAÇÃO DO ID
+    ----------------------------------------------------------------
+
+    IF p_id_fab IS NULL THEN
+        RETURN -1;
     END IF;
 
-    /*IF p_nome IS NULL THEN
-        v_retorno = -2; --NENHUM NOME FOI INFORMADO
-    END IF;*/
+    IF p_id_fab <> TRUNC(p_id_fab) THEN
+        RETURN -2;
+    END IF;
 
-    SELECT COUNT(*) 
-    INTO v_contador
-    FROM fabricante 
+    IF p_id_fab NOT BETWEEN 1 AND 9999 THEN
+        RETURN -3;
+    END IF;
+
+    SELECT COUNT(*)
+    INTO v_qtde
+    FROM fabricante
     WHERE id_fab = p_id_fab;
 
-    SELECT COUNT(nome)
-    INTO v_contador_nome
-    FROM fabricante 
-    WHERE nome = p_nome;
-
-    IF v_contador = 1 THEN
-        v_retorno := -2; --O ID JÁ EXISTE
-    ELSE
-        IF v_contador_nome = 1 THEN
-            v_retorno := -3; --O NOME INFORMADO JÁ EXISTE NA TABELA
-        ELSE
-            IF p_id_fab IS NULL OR p_id_fab NOT BETWEEN 1 AND 9999 THEN
-                v_retorno := -4; --O ID INFORMADO NÃO FOI INFORMADO OU NÃO ESTÁ ENTRE O INTERVALO PERMITIDO (1 E 9999)
-            ELSE 
-                IF p_nome IS NULL OR LENGTH(p_nome) > 120 THEN --MAIOR OU IGUAL***
-                    v_retorno := -5; --NOME NULO OU MAIOR DO QUE O PERMITIDO (120 CARACTERES)
-                ELSE
-                    IF LENGTH(p_apelido) > 60 THEN
-                        v_retorno := -6; --APELIDO MAIOR DO QUE O PERMITIDO (60 CARACTERES)
-                    ELSE
-                        INSERT INTO fabricante (id_fab, nome, apelido)
-                        values (p_id_fab, p_nome, p_apelido);
-
-                        --v_retorno = --SUCESSO NA OPERACAO
-                    END IF;
-                END IF;
-            END IF;
-        END IF;
+    IF v_qtde > 0 THEN
+        RETURN -4;
     END IF;
+
+    ----------------------------------------------------------------
+    -- VALIDAÇÃO DO NOME
+    ----------------------------------------------------------------
+
+    IF p_nome IS NULL OR TRIM(p_nome) IS NULL THEN
+        RETURN -5;
+    END IF;
+
+    IF LENGTH(TRIM(p_nome)) > 120 THEN
+        RETURN -6;
+    END IF;
+
+    ----------------------------------------------------------------
+    -- VALIDAÇÃO DE NOME DUPLICADO
+    -- IGNORANDO:
+    -- ACENTOS
+    -- ESPAÇOS NAS PONTAS
+    -- MAIÚSCULO/MINÚSCULO
+    ----------------------------------------------------------------
+
+    SELECT COUNT(*)
+    INTO v_qtde
+    FROM fabricante
+    WHERE TRANSLATE(
+            UPPER(TRIM(nome)),
+            'ÁÉÍÓÚÂÊÎÔÛÃÕÀÈÌÒÙÄËÏÖÜÇ',
+            'AEIOUAEIOUAOAEIOUAEIOUC'
+          )
+          =
+          TRANSLATE(
+            UPPER(TRIM(p_nome)),
+            'ÁÉÍÓÚÂÊÎÔÛÃÕÀÈÌÒÙÄËÏÖÜÇ',
+            'AEIOUAEIOUAOAEIOUAEIOUC'
+          );
+
+    IF v_qtde > 0 THEN
+        RETURN -7;
+    END IF;
+
+    ----------------------------------------------------------------
+    -- VALIDAÇÃO DO APELIDO
+    ----------------------------------------------------------------
+
+    IF p_apelido IS NOT NULL THEN
+
+        IF LENGTH(TRIM(p_apelido)) > 60 THEN
+            RETURN -8;
+        END IF;
+
+    END IF;
+
+    ----------------------------------------------------------------
+    -- INSERT
+    ----------------------------------------------------------------
+
+    INSERT INTO fabricante (
+        id_fab,
+        nome,
+        apelido
+    )
+    VALUES (
+        p_id_fab,
+        TRIM(p_nome),
+        TRIM(p_apelido)
+    );
+
     COMMIT;
-    RETURN v_retorno;
 
-    EXCEPTION
-        WHEN OTHERS THEN 
-            ROLLBACK;
+    RETURN 0;
 
-            /*V_ERRO := SQLCODE;
-            V_DESC_ERRO := SQLERRM;
+EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
 
-            INSERT INTO LOG_EXECUCAO(ID_LOG, ERRO, DESC_ERRO, LINHA_ERRO, NOME_CODIGO, PARAMETROS, DTH_ERRO, USUARIO, RESOLVIDO, DESC_RESOLVIDO)
-            VALUES(
-                SEQ_LOG_EXECUCAO.NEXTVAL,
-                V_ERRO,
-                V_DESC_ERRO,
-                DBMS_UTILITY.FORMAT_ERROR_BACKTRACE,
-                'FUNC_INSERIRFABRICANTE',
-                'P_PERC = '||P_PERC,
-                SYSDATE,
-                USER,
-                'N',
-                NULL
-            );
-            COMMIT;*/
-            RETURN SQLCODE;
+        v_erro := SQLCODE;
+        v_desc_erro := SQLERRM;
+
+        INSERT INTO LOG_EXECUCAO (
+            ID_LOG,
+            ERRO,
+            DESC_ERRO,
+            LINHA_ERRO,
+            NOME_CODIGO,
+            PARAMETROS,
+            DTH_ERRO,
+            USUARIO,
+            RESOLVIDO,
+            DESC_RESOLVIDO
+        )
+        VALUES (
+            SEQ_LOG_EXECUCAO.NEXTVAL,
+            v_erro,
+            v_desc_erro,
+            DBMS_UTILITY.FORMAT_ERROR_BACKTRACE,
+            'FUNC_INSERIRFABRICANTE',
+            'P_ID_FAB=' || p_id_fab ||
+            ' | P_NOME=' || p_nome ||
+            ' | P_APELIDO=' || p_apelido,
+            SYSDATE,
+            USER,
+            'N',
+            NULL
+        );
+
+        COMMIT;
+
+        RETURN v_erro;
+
 END;
+/
 -------------------------------------
 
  INSERT INTO fabricante (id_fab, nome, apelido)
