@@ -1,32 +1,33 @@
-# oracle-programming
+# database-programming
 
-Repositório com materiais e projetos da disciplina **Programação de Banco de Dados** do curso **CST em Banco de Dados**.
+epositório que reúne o conteúdo de códigos e scripts SQL e PL/SQL de atividades, exercícios e projetos (trabalhos finais da disciplina) desenvolvidos em Banco de Dados Oracle durante as disciplinas **Programação de Banco de Dados** (3º semestre) e **Programação Avançada de Banco de Dados** (4º semestre) do **Curso Superior de Tecnologia em Banco de Dados** da FATEC.
+
+## Tecnologias
+
+- PL/SQL
+- SQL
+- Oracle Database
+- Oracle SQL Developer
+- Oracle SQL Developer Data Modeler
+- Oracle VirtualBox
 
 ## Estrutura do repositório
 
-- **`programacao-bd/`**  
-  Conteúdos e atividades da disciplina **Programação de Banco de Dados** (3º semestre).
+- **`programacao-bd/`**:
+  Diretório que reúne materiais das atividades realizadas nas aulas da disciplina **Programação de Banco de Dados** (3º semestre).
 
-- **`programacao-avancada-bd/`**  
-  Conteúdos e atividades da disciplina **Programação Avançada de Banco de Dados** (4º semestre).
+- **`programacao-avancada-bd/`**:
+  Diretório que reúne materiais das atividades realizadas nas aulas da disciplina **Programação Avançada de Banco de Dados** (4º semestre).
 
-## Projetos (trabalhos finais)
+## Projetos Finais
 
 - **`projeto_sistema_vendas.sql`**  
-  Script do trabalho final relacionado ao **Sistema de Vendas**, da matéria Programação de Banco de Dados (3° Semestre).
+  Script do trabalho final **Sistema de Vendas** (3° Semestre).
 
 - **`projeto_revenda_veiculos.sql`**  
-  Script do trabalho final relacionado à **Revenda de Veículos**, da matéria Programação Avançada de Banco de Dados (4° Semestre).
-
-## Como usar
-
-1. Abra este repositório no **Visual Studio Code**.
-2. Localize a disciplina desejada nas pastas:
-- `programacao-bd/`
-- `programacao-avancada-bd/`
-3. Para executar os scripts `.sql`, utilize seu ambiente de banco (ex.: Oracle/SQL Developer, SQL*Plus, ou extensão de SQL no VS Code conforme sua configuração) e rode os arquivos necessários.
+  Script do trabalho final **Revenda de Veículos** (4° Semestre).
 
 ## Observações
 
-- Os scripts podem criar/alterar objetos no banco (tabelas, views, procedures, triggers). Execute em um schema/ambiente de testes quando apropriado.
-- Ajuste permissões, usuário, schema e tablespaces conforme o seu ambiente.
+- Para executar os scripts `.sql`, rode os arquivos necessários em ambiente de banco de dados (Oracle/SQL Developer, SQL*Plus, ou extensão SQL no VS Code).
+- Os scripts podem criar ou alterar objetos no banco (tabelas, views, procedures, triggers). Sendo recomendado executar em um schema/ambiente de testes e ajustar permissões, usuário, schema e tablespaces conforme necessário para seu ambiente.
