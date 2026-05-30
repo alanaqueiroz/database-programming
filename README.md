@@ -1,6 +1,6 @@
 # database-programming
 
-epositório que reúne o conteúdo de códigos e scripts SQL e PL/SQL de atividades, exercícios e projetos (trabalhos finais da disciplina) desenvolvidos em Banco de Dados Oracle durante as disciplinas **Programação de Banco de Dados** (3º semestre) e **Programação Avançada de Banco de Dados** (4º semestre) do **Curso Superior de Tecnologia em Banco de Dados** da FATEC.
+Repositório que reúne o conteúdo de códigos e scripts SQL e PL/SQL de atividades, exercícios e projetos (trabalhos finais da disciplina) desenvolvidos em Banco de Dados Oracle durante as disciplinas **Programação de Banco de Dados** (3º semestre) e **Programação Avançada de Banco de Dados** (4º semestre) do **Curso Superior de Tecnologia em Banco de Dados** da FATEC.
 
 ## Tecnologias
 
