@@ -158,13 +158,160 @@ ALTER TABLE venda
  
 ALTER TABLE versao ADD CONSTRAINT versao_modelo_fk FOREIGN KEY ( id_mod, id_fab ) REFERENCES modelo ( id_mod, id_fab );
 
-----------
+/**
+ * ============================================================================
+ * PROJETO.............: REVENDA DE VEICULOS
+ * FUNCAO..............: FUNC_INSERIRFABRICANTE
+ * TIPO................: FUNCTION
+ * OBJETIVO............: INSERIR UM NOVO FABRICANTE REALIZANDO VALIDACOES
+ *                       DE REGRA DE NEGOCIO E CONTROLE DE DUPLICIDADE.
+ *
+ * AUTOR...............: ALANA QUEIROZ BRAGA
+ * DATA................: 30/05/2026
+ * ============================================================================
+ *
+ * DESCRICAO:
+ * ---------------------------------------------------------------------------
+ * ESTA FUNCAO REALIZA A INSERCAO DE UM NOVO FABRICANTE NA TABELA
+ * FABRICANTE.
+ *
+ * A FUNCAO EXECUTA VALIDACOES DE:
+ *
+ * - PREENCHIMENTO DOS CAMPOS OBRIGATORIOS
+ * - TAMANHO DOS CAMPOS
+ * - INTERVALO NUMERICO
+ * - VALIDACAO DE NUMERO INTEIRO
+ * - DUPLICIDADE DE CODIGO
+ * - DUPLICIDADE DE NOME
+ *
+ * A VALIDACAO DE NOME DUPLICADO IGNORA:
+ *
+ * - ACENTOS
+ * - ESPACOS EM BRANCO NAS EXTREMIDADES
+ * - DIFERENCA ENTRE LETRAS MAIUSCULAS E MINUSCULAS
+ *
+ * O CAMPO APELIDO E OPCIONAL.
+ *
+ * EM CASO DE ERRO INESPERADO, A EXCEPTION GRAVA O ERRO NA
+ * TABELA LOG_EXECUCAO.
+ *
+ * A FUNCAO UTILIZA:
+ *
+ * - COMMIT EM CASO DE SUCESSO
+ * - ROLLBACK EM CASO DE ERRO
+ *
+ * ---------------------------------------------------------------------------
+ * PARAMETROS:
+ * ---------------------------------------------------------------------------
+ *
+ * @param P_ID_FAB
+ *        CODIGO IDENTIFICADOR DO FABRICANTE.
+ *        O VALOR DEVE SER:
+ *        - NUMERICO
+ *        - INTEIRO
+ *        - ENTRE 1 E 9999
+ *
+ * @param P_NOME
+ *        NOME DO FABRICANTE.
+ *        REGRAS:
+ *        - OBRIGATORIO
+ *        - TAMANHO MAXIMO DE 120 CARACTERES
+ *        - NAO PODE EXISTIR DUPLICADO
+ *
+ * @param P_APELIDO
+ *        APELIDO DO FABRICANTE.
+ *        REGRAS:
+ *        - OPCIONAL
+ *        - TAMANHO MAXIMO DE 60 CARACTERES
+ *
+ * ---------------------------------------------------------------------------
+ * RETORNO:
+ * ---------------------------------------------------------------------------
+ *
+ * @return NUMBER
+ *
+ *  0  = FABRICANTE INSERIDO COM SUCESSO
+ *
+ * -1  = ID NAO INFORMADO
+ *       O PARAMETRO P_ID_FAB FOI ENVIADO NULO.
+ *
+ * -2  = ID INFORMADO NAO E INTEIRO
+ *       O VALOR INFORMADO POSSUI CASAS DECIMAIS.
+ *
+ * -3  = ID FORA DA FAIXA PERMITIDA
+ *       O ID DEVE ESTAR ENTRE 1 E 9999.
+ *
+ * -4  = ID JA EXISTE
+ *       JA EXISTE UM FABRICANTE COM O MESMO ID.
+ *
+ * -5  = NOME NAO INFORMADO
+ *       O PARAMETRO P_NOME FOI ENVIADO NULO OU VAZIO.
+ *
+ * -6  = NOME MAIOR QUE 120 CARACTERES
+ *       O NOME INFORMADO EXCEDE O TAMANHO MAXIMO.
+ *
+ * -7  = NOME JA EXISTE
+ *       JA EXISTE UM FABRICANTE COM O MESMO NOME.
+ *
+ * -8  = APELIDO MAIOR QUE 60 CARACTERES
+ *       O APELIDO INFORMADO EXCEDE O TAMANHO MAXIMO.
+ *
+ * SQLCODE = ERRO INESPERADO
+ *           QUALQUER ERRO NAO TRATADO PELAS VALIDACOES.
+ *
+ * ---------------------------------------------------------------------------
+ * EXEMPLO DE UTILIZACAO:
+ * ---------------------------------------------------------------------------
+ *
+ * DECLARE
+ *     V_RETORNO NUMBER;
+ * BEGIN
+ *
+ *     V_RETORNO := FUNC_INSERIRFABRICANTE(
+ *         1,
+ *         'TOYOTA',
+ *         'TOY'
+ *     );
+ *
+ *     DBMS_OUTPUT.PUT_LINE(
+ *         'RETORNO = ' || V_RETORNO
+ *     );
+ *
+ * END;
+ *
+ * ============================================================================
+ */
 
-/* DDL Desenvolvido */
-
+/**
+ * ============================================================================
+ * TABELA: LOG_EXECUCAO
+ * ----------------------------------------------------------------------------
+ * Objetivo:
+ * Registrar exceções inesperadas ocorridas durante a execução de códigos PL/SQL.
+ * ============================================================================
+ */
 DROP TABLE LOG_EXECUCAO;
 DROP SEQUENCE SEQ_LOG_EXECUCAO;
 
+/**
+ * ============================================================================
+ * TABELA: LOG_EXECUCAO
+ * ============================================================================
+ * Finalidade:
+ * Armazenar informações sobre exceções inesperadas ocorridas durante a
+ * execução de procedimentos, funções e demais códigos PL/SQL.
+ *
+ * Informações registradas:
+ * - Código do erro (SQLCODE)
+ * - Descrição do erro (SQLERRM)
+ * - Linha da ocorrência
+ * - Nome do código executado
+ * - Parâmetros recebidos
+ * - Data e hora da ocorrência
+ * - Usuário responsável pela execução
+ * - Status de resolução
+ * ============================================================================
+ */
 CREATE TABLE LOG_EXECUCAO(
     ID_LOG NUMBER PRIMARY KEY,
     ERRO NUMBER NOT NULL,
@@ -178,124 +325,171 @@ CREATE TABLE LOG_EXECUCAO(
     DESC_RESOLVIDO VARCHAR2(1000)
 );
 
+/**
+ * ============================================================================
+ * SEQUENCE: SEQ_LOG_EXECUCAO
+ * ============================================================================
+ * Finalidade:
+ * Gerar identificadores únicos para os registros da tabela LOG_EXECUCAO.
+ * ============================================================================
+ */
 CREATE SEQUENCE SEQ_LOG_EXECUCAO
 START WITH 1
 INCREMENT BY 1
 NOCACHE
 NOCYCLE;
 
-CREATE FUNCTION FUNC_INSERIRFABRICANTE (p_id_fab fabricante.id_fab%TYPE, p_nome fabricante.nome%TYPE, p_apelido fabricante.apelido%TYPE) 
+/**
+ * ============================================================================
+ * FUNCTION: FUNC_INSERIRFABRICANTE
+ * ============================================================================
+ * Finalidade:
+ * Inserir registros na tabela FABRICANTE aplicando todas as regras de negócio
+ * definidas para o cadastro de fabricantes.
+ *
+ * Parâmetros:
+ * @param P_ID_FAB   Código do fabricante.
+ * @param P_NOME     Nome do fabricante.
+ * @param P_APELIDO  Apelido do fabricante (opcional).
+ *
+ * Validações executadas:
+ * - Verificação de preenchimento dos campos obrigatórios.
+ * - Verificação do tamanho dos campos.
+ * - Validação do intervalo permitido para o código.
+ * - Verificação de valor inteiro para o código.
+ * - Verificação de duplicidade de código.
+ * - Verificação de duplicidade de nome.
+ *
+ * Retornos:
+ *  0  = Fabricante inserido com sucesso.
+ * -1  = Código não informado.
+ * -2  = Código informado não é inteiro.
+ * -3  = Código fora da faixa permitida (1 a 9999).
+ * -4  = Código já cadastrado.
+ * -5  = Nome não informado.
+ * -6  = Nome excede 120 caracteres.
+ * -7  = Nome já cadastrado.
+ * -8  = Apelido excede 60 caracteres.
+ *
+ * Tratamento de exceções:
+ * Qualquer erro não previsto nas validações será registrado na tabela
+ * LOG_EXECUCAO para auditoria e posterior análise da equipe de suporte.
+ * ============================================================================
+ */
+CREATE OR REPLACE FUNCTION FUNC_INSERIRFABRICANTE (
+    P_ID_FAB   IN FABRICANTE.ID_FAB%TYPE,
+    P_NOME     IN FABRICANTE.NOME%TYPE,
+    P_APELIDO  IN FABRICANTE.APELIDO%TYPE
+)
 RETURN NUMBER
 IS
-    v_qtde          NUMBER;
-    v_retorno       NUMBER := 0;
-
-    v_erro          NUMBER;
-    v_desc_erro     VARCHAR2(1000);
+    V_RETORNO      NUMBER(5);
+    V_QTDE         NUMBER;
+    V_ERRO         NUMBER;
+    V_DESC_ERRO    VARCHAR2(1000);
 
 BEGIN
 
-    ----------------------------------------------------------------
-    -- VALIDAÇÃO DO ID
-    ----------------------------------------------------------------
+    IF P_ID_FAB IS NULL THEN
 
-    IF p_id_fab IS NULL THEN
-        RETURN -1;
-    END IF;
+        V_RETORNO := -1;
 
-    IF p_id_fab <> TRUNC(p_id_fab) THEN
-        RETURN -2;
-    END IF;
+    ELSIF P_ID_FAB <> TRUNC(P_ID_FAB) THEN
 
-    IF p_id_fab NOT BETWEEN 1 AND 9999 THEN
-        RETURN -3;
-    END IF;
+        V_RETORNO := -2;
 
-    SELECT COUNT(*)
-    INTO v_qtde
-    FROM fabricante
-    WHERE id_fab = p_id_fab;
+    ELSIF P_ID_FAB NOT BETWEEN 1 AND 9999 THEN
 
-    IF v_qtde > 0 THEN
-        RETURN -4;
-    END IF;
+        V_RETORNO := -3;
 
-    ----------------------------------------------------------------
-    -- VALIDAÇÃO DO NOME
-    ----------------------------------------------------------------
+    ELSE
 
-    IF p_nome IS NULL OR TRIM(p_nome) IS NULL THEN
-        RETURN -5;
-    END IF;
+        SELECT COUNT(*)
+        INTO V_QTDE
+        FROM FABRICANTE
+        WHERE ID_FAB = P_ID_FAB;
 
-    IF LENGTH(TRIM(p_nome)) > 120 THEN
-        RETURN -6;
-    END IF;
+        IF V_QTDE > 0 THEN
 
-    ----------------------------------------------------------------
-    -- VALIDAÇÃO DE NOME DUPLICADO
-    -- IGNORANDO:
-    -- ACENTOS
-    -- ESPAÇOS NAS PONTAS
-    -- MAIÚSCULO/MINÚSCULO
-    ----------------------------------------------------------------
+            V_RETORNO := -4;
 
-    SELECT COUNT(*)
-    INTO v_qtde
-    FROM fabricante
-    WHERE TRANSLATE(
-            UPPER(TRIM(nome)),
-            'ÁÉÍÓÚÂÊÎÔÛÃÕÀÈÌÒÙÄËÏÖÜÇ',
-            'AEIOUAEIOUAOAEIOUAEIOUC'
-          )
-          =
-          TRANSLATE(
-            UPPER(TRIM(p_nome)),
-            'ÁÉÍÓÚÂÊÎÔÛÃÕÀÈÌÒÙÄËÏÖÜÇ',
-            'AEIOUAEIOUAOAEIOUAEIOUC'
-          );
+        ELSE
 
-    IF v_qtde > 0 THEN
-        RETURN -7;
-    END IF;
+            IF P_NOME IS NULL
+               OR LENGTH(TRIM(P_NOME)) = 0 THEN
 
-    ----------------------------------------------------------------
-    -- VALIDAÇÃO DO APELIDO
-    ----------------------------------------------------------------
+                V_RETORNO := -5;
 
-    IF p_apelido IS NOT NULL THEN
+            ELSIF LENGTH(TRIM(P_NOME)) > 120 THEN
 
-        IF LENGTH(TRIM(p_apelido)) > 60 THEN
-            RETURN -8;
+                V_RETORNO := -6;
+
+            ELSE
+
+                SELECT COUNT(*)
+                INTO V_QTDE
+                FROM FABRICANTE
+                WHERE
+                TRANSLATE(
+                    UPPER(TRIM(NOME)),
+                    'ÁÉÍÓÚÂÊÎÔÛÃÕÀÈÌÒÙÄËÏÖÜÇ',
+                    'AEIOUAEIOUAOAEIOUAEIOUC'
+                )
+                =
+                TRANSLATE(
+                    UPPER(TRIM(P_NOME)),
+                    'ÁÉÍÓÚÂÊÎÔÛÃÕÀÈÌÒÙÄËÏÖÜÇ',
+                    'AEIOUAEIOUAOAEIOUAEIOUC'
+                );
+
+                IF V_QTDE > 0 THEN
+
+                    V_RETORNO := -7;
+
+                ELSE
+
+                    IF P_APELIDO IS NOT NULL
+                       AND LENGTH(TRIM(P_APELIDO)) > 60 THEN
+
+                        V_RETORNO := -8;
+
+                    ELSE
+
+                        INSERT INTO FABRICANTE (
+                            ID_FAB,
+                            NOME,
+                            APELIDO
+                        )
+                        VALUES (
+                            P_ID_FAB,
+                            TRIM(P_NOME),
+                            TRIM(P_APELIDO)
+                        );
+
+                        V_RETORNO := 0;
+
+                    END IF;
+
+                END IF;
+
+            END IF;
+
         END IF;
 
     END IF;
 
-    ----------------------------------------------------------------
-    -- INSERT
-    ----------------------------------------------------------------
-
-    INSERT INTO fabricante (
-        id_fab,
-        nome,
-        apelido
-    )
-    VALUES (
-        p_id_fab,
-        TRIM(p_nome),
-        TRIM(p_apelido)
-    );
-
     COMMIT;
 
-    RETURN 0;
+    RETURN V_RETORNO;
 
 EXCEPTION
+
     WHEN OTHERS THEN
+
         ROLLBACK;
 
-        v_erro := SQLCODE;
-        v_desc_erro := SQLERRM;
+        V_ERRO := SQLCODE;
+        V_DESC_ERRO := SQLERRM;
 
         INSERT INTO LOG_EXECUCAO (
             ID_LOG,
@@ -311,13 +505,13 @@ EXCEPTION
         )
         VALUES (
             SEQ_LOG_EXECUCAO.NEXTVAL,
-            v_erro,
-            v_desc_erro,
+            V_ERRO,
+            V_DESC_ERRO,
             DBMS_UTILITY.FORMAT_ERROR_BACKTRACE,
             'FUNC_INSERIRFABRICANTE',
-            'P_ID_FAB=' || p_id_fab ||
-            ' | P_NOME=' || p_nome ||
-            ' | P_APELIDO=' || p_apelido,
+            'P_ID_FAB = ' || P_ID_FAB ||
+            ' | P_NOME = ' || P_NOME ||
+            ' | P_APELIDO = ' || P_APELIDO,
             SYSDATE,
             USER,
             'N',
@@ -326,27 +520,124 @@ EXCEPTION
 
         COMMIT;
 
-        RETURN v_erro;
+        RETURN SQLCODE;
 
 END;
 /
--------------------------------------
 
- INSERT INTO fabricante (id_fab, nome, apelido)
-        values (p_id_fab, p_nome, p_apelido)
-/*
-Validacoes:
--Testar o tamanho dos campos; apelido pode ser nulo, mas os outros n; verificar a existencia do codigo na tabela; validar tamanho do id (1 a 9999); o campo apelido pode ser nulo;
--Não deve permitir que o campo nome tenha valor repetido dentro da tabela. 
--TESTAR SE O NUMERO INFORMADO É FLOAT
+/**
+ * ============================================================================
+ * TESTES DA FUNCTION: FUNC_INSERIRFABRICANTE
+ * ============================================================================
+ * Finalidade:
+ * Validar as regras de negócio implementadas na função
+ * FUNC_INSERIRFABRICANTE.
+ *
+ * Cenários testados:
+ * 1. Inserção válida de fabricante.
+ * 2. Tentativa de cadastro com código já existente.
+ * 3. Tentativa de cadastro com nome já existente.
+ * 4. Tentativa de cadastro com nome duplicado contendo acentuação.
+ * 5. Tentativa de cadastro com código decimal.
+ * 6. Tentativa de cadastro sem informar nome.
+ * 7. Tentativa de cadastro com apelido acima do tamanho permitido.
+ *
+ * Resultado esperado:
+ * Cada execução deve retornar o código correspondente à regra validada,
+ * conforme documentação da função.
+ * ============================================================================
+ */
+SET SERVEROUTPUT ON;
 
+DECLARE
 
- --RE-ENUMERAR OS ERROS
-*/
+    V_RETORNO NUMBER;
 
- /*DECLARE
-    RETORNO NUMBER(5);
 BEGIN
-    RETORNO := FUNC_INSERIRFABRICANTE(1, 'ALINE', 'ALINE');
-    DBMS_OUTPUT.PUT_LINE('DO CODIGO DA CHAMADA -> RETORNO = '||RETORNO);
-END;*/
+
+    DBMS_OUTPUT.PUT_LINE('-----------------------------------');
+    DBMS_OUTPUT.PUT_LINE('TESTE 1 - INSERCAO VALIDA');
+    DBMS_OUTPUT.PUT_LINE('-----------------------------------');
+
+    V_RETORNO := FUNC_INSERIRFABRICANTE(
+        1,
+        'TOYOTA',
+        'TOY'
+    );
+
+    DBMS_OUTPUT.PUT_LINE('RETORNO = ' || V_RETORNO);
+
+    DBMS_OUTPUT.PUT_LINE('-----------------------------------');
+    DBMS_OUTPUT.PUT_LINE('TESTE 2 - ID DUPLICADO');
+    DBMS_OUTPUT.PUT_LINE('-----------------------------------');
+
+    V_RETORNO := FUNC_INSERIRFABRICANTE(
+        1,
+        'HONDA',
+        'HON'
+    );
+
+    DBMS_OUTPUT.PUT_LINE('RETORNO = ' || V_RETORNO);
+
+    DBMS_OUTPUT.PUT_LINE('-----------------------------------');
+    DBMS_OUTPUT.PUT_LINE('TESTE 3 - NOME DUPLICADO');
+    DBMS_OUTPUT.PUT_LINE('-----------------------------------');
+
+    V_RETORNO := FUNC_INSERIRFABRICANTE(
+        2,
+        'TOYOTA',
+        'TYT'
+    );
+
+    DBMS_OUTPUT.PUT_LINE('RETORNO = ' || V_RETORNO);
+
+    DBMS_OUTPUT.PUT_LINE('-----------------------------------');
+    DBMS_OUTPUT.PUT_LINE('TESTE 4 - NOME DUPLICADO COM ACENTO');
+    DBMS_OUTPUT.PUT_LINE('-----------------------------------');
+
+    V_RETORNO := FUNC_INSERIRFABRICANTE(
+        3,
+        'TÓYÓTÁ',
+        'TOY'
+    );
+
+    DBMS_OUTPUT.PUT_LINE('RETORNO = ' || V_RETORNO);
+
+    DBMS_OUTPUT.PUT_LINE('-----------------------------------');
+    DBMS_OUTPUT.PUT_LINE('TESTE 5 - ID FLOAT');
+    DBMS_OUTPUT.PUT_LINE('-----------------------------------');
+
+    V_RETORNO := FUNC_INSERIRFABRICANTE(
+        1.5,
+        'BMW',
+        'BMW'
+    );
+
+    DBMS_OUTPUT.PUT_LINE('RETORNO = ' || V_RETORNO);
+
+    DBMS_OUTPUT.PUT_LINE('-----------------------------------');
+    DBMS_OUTPUT.PUT_LINE('TESTE 6 - NOME NULO');
+    DBMS_OUTPUT.PUT_LINE('-----------------------------------');
+
+    V_RETORNO := FUNC_INSERIRFABRICANTE(
+        4,
+        NULL,
+        'TES'
+    );
+
+    DBMS_OUTPUT.PUT_LINE('RETORNO = ' || V_RETORNO);
+
+    DBMS_OUTPUT.PUT_LINE('-----------------------------------');
+    DBMS_OUTPUT.PUT_LINE('TESTE 7 - APELIDO MAIOR QUE 60');
+    DBMS_OUTPUT.PUT_LINE('-----------------------------------');
+
+    V_RETORNO := FUNC_INSERIRFABRICANTE(
+        5,
+        'TESLA',
+        RPAD('A', 61, 'A')
+    );
+
+    DBMS_OUTPUT.PUT_LINE('RETORNO = ' || V_RETORNO);
+
+END;
+/
